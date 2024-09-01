@@ -1,0 +1,30 @@
+[package]
+name = "tdx-quote-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+intel-tee-quote-verification-rs = "0.3.0"
+tdx-attest-rs = { git = "https://github.com/intel/SGXDataCenterAttestationPrimitives" }
+intel-tee-quote-verification-sys = "0.2.1"
+
+sgx-dcap-ql-rs = { git = "https://github.com/intel/SGXDataCenterAttestationPrimitives" }
+structopt = "0.3"
+pki-types = { package = "rustls-pki-types", version = "1" }
+rustls-native-certs = { version = "0.7", optional = true }
+tokio-rustls = { version = "0.26", default-features = false }
+hyper-rustls = "0.27.2"
+hyper = "1.4.1"
+http = "1"
+http-body-util = "0.1"
+hyper-util = { version = "0.1", default-features = false, features = ["server-auto"] }
+rustls = { version = "0.23", default-features = false, features = ["tls12"] }
+rustls-pemfile = "2"
+tokio = { version = "1.0", features = ["io-std", "macros", "net", "rt-multi-thread"] }
+
+[features]
+TD_ENV = []
+ring = ["rustls/ring"]
+aws-lc-rs = ["rustls/aws_lc_rs"]
+native-tokio = ["rustls-native-certs"]
