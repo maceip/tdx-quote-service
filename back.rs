@@ -87,6 +87,7 @@ async fn run_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Error> {
+
     let mut response = Response::new(Full::default());
     let mut collateral_expiration_status = 1u32;
     let mut quote_verification_result = sgx_ql_qv_result_t::SGX_QL_QV_RESULT_UNSPECIFIED;
@@ -132,23 +133,31 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
         }
         // todo
         (&Method::POST, "/verify") => {
-            let quote_path = "quote.dat";
-            let quote = std::fs::read(quote_path).expect("Error: Unable to open quote file");
-            let collateral = tee_qv_get_collateral(&quote);
-            let current_time = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap_or(Duration::ZERO)
-                .as_secs() as i64;
+ let quote_path = "quote.dat";
+    let quote = std::fs::read(quote_path).expect("Error: Unable to open quote file");
+ let collateral = tee_qv_get_collateral(&quote);
+        let current_time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or(Duration::ZERO)
+             .as_secs() as i64;
 
-            match tee_verify_quote(&quote, collateral.ok().as_ref(), current_time, None, None) {
-                Ok((colla_exp_stat, qv_result)) => {
-                    collateral_expiration_status = colla_exp_stat;
-                    quote_verification_result = qv_result;
-                    println!("\tInfo: App: tee_verify_quote successfully returned.");
-                    *response.body_mut() = Full::from(colla_exp_stat.to_string());
-                }
-                Err(e) => println!("\tError: App: tee_verify_quote failed: {:#04x}", e as u32),
+match tee_verify_quote(
+            quote,
+            collateral.ok().as_ref(),
+            current_time,
+            None,
+            p_supplemental_data,
+        ) {
+            Ok((colla_exp_stat, qv_result)) => {
+                collateral_expiration_status = colla_exp_stat;
+                quote_verification_result = qv_result;
+                println!("\tInfo: App: tee_verify_quote successfully returned.");
             }
+            Err(e) => println!("\tError: App: tee_verify_quote failed: {:#04x}", e as u32),
+        }
+
+		 *response.body_mut() = Full::from("SS");
+
         }
         // Catch-all 404.
         _ => {

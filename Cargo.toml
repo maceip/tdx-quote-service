@@ -8,7 +8,7 @@ clap = { version = "4.0", features = ["derive"] }
 intel-tee-quote-verification-rs = "0.3.0"
 tdx-attest-rs = { git = "https://github.com/intel/SGXDataCenterAttestationPrimitives" }
 intel-tee-quote-verification-sys = "0.2.1"
-
+rand = "0.8.5"
 sgx-dcap-ql-rs = { git = "https://github.com/intel/SGXDataCenterAttestationPrimitives" }
 structopt = "0.3"
 pki-types = { package = "rustls-pki-types", version = "1" }
