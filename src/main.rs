@@ -16,7 +16,6 @@ use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
 fn main() {
-    // Serve an echo service over HTTPS, with proper error handling.
     if let Err(e) = run_server() {
         eprintln!("FAILED: {}", e);
         std::process::exit(1);
@@ -47,7 +46,7 @@ async fn run_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load private key.
     let key = load_private_key("fixture/sample.rsa")?;
 
-    println!("Starting to serve on https://{}", addr);
+    println!("tdx-quote-service running on https://{}", addr);
 
     // Create a TCP listener via tokio.
     let incoming = TcpListener::bind(&addr).await?;
@@ -84,8 +83,6 @@ async fn run_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 }
 
-// Custom echo service, handling two different routes and a
-// catch-all 404 responder.
 async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Error> {
     let mut response = Response::new(Full::default());
     match (req.method(), req.uri().path()) {
@@ -116,8 +113,8 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
                 }
             }
         }
-        // Echo service route.
-        (&Method::POST, "/echo") => {
+        // todo
+        (&Method::POST, "/verify") => {
             *response.body_mut() = Full::from(
                 req.into_body()
                     .collect()
