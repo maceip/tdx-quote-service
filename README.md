@@ -1,6 +1,7 @@
 <img src=https://github.com/user-attachments/assets/e3b93253-2079-4344-b272-35e1995f0b1e width="100" height="100">
 
-# qgs & qvl
+# rust qgs & qvl
+###### testing only
 
 ## build dep
 
