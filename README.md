@@ -9,7 +9,7 @@
 
 get linux-sgx, build sdk & psw, install:
 ```
-sudo dpkg -i libsgx-dcap-quote-verify-dev_1.21.100.3-noble1_amd64.deb
+sudo dpkg -i libsgx-dcap-ql-dev_1.21.100.3-noble1_amd64.deb
 ```
 
 ## generate a quote with 64 bytes of report data:
