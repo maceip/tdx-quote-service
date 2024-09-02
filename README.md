@@ -11,8 +11,13 @@ get linux-sgx, build sdk & psw, install:
 sudo dpkg -i libsgx-dcap-quote-verify-dev_1.21.100.3-noble1_amd64.deb
 ```
 
-## run it from a td then call:
+## generate a quote with 64 bytes of report data:
 ```
-curl -X POST -k -H "Content-Type: application/json" -d "ShcEAz3eCNzTelMGIcvUyF9EsBVbU6xw3IVp4sP2Nyv1S3jmZh8bF2XEMzvsd65i" https://localhost:31337/quote
+curl --output quote.dat -X POST -H "Content-Type: application/json" -d "ShcEAz3eCNzTelMGIcvUyF9EsBVbU6xw3IVp4sP2Nyv1S3jmZh8bF2XEMzvsd65i" https://mockquote.tee.cash/quote
+```
+
+## verify a quote:
+```
+curl -d @quote.dat https://mockquote.tee.cash/verify
 ```
 
