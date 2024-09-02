@@ -1,6 +1,6 @@
 use http::{Method, Request, Response, StatusCode};
 use http_body_util::{BodyExt, Full};
-use hyper::body::{Bytes, Incoming};
+use hyper::body::{Buf, Bytes, Incoming};
 use hyper::service::service_fn;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
@@ -17,6 +17,7 @@ use std::{env, fs, io};
 use tdx_attest_rs;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
+pub const REPORT_DATA_SIZE: usize = 64;
 
 fn main() {
     if let Err(e) = run_server() {
@@ -97,14 +98,28 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
         data_size: 0,
         p_data: &mut supp_data as *mut sgx_ql_qv_supplemental_t as *mut u8,
     };
+
     match (req.method(), req.uri().path()) {
         // Help route.
-        (&Method::GET, "/quote") => {
-            let mut rng = rand::thread_rng();
+        (&Method::POST, "/quote") => {
+            let mut whole_body = req
+                .into_body()
+                .collect()
+                .await?
+                .aggregate();
 
+            // Ensure that the body is the correct size for tdx_report_data_t
+            if whole_body.remaining() != 64 {
+                *response.status_mut() = StatusCode::BAD_REQUEST;
+            }
+
+            // Convert the body into tdx_report_data_t
+            let mut report_data_bytes = [0u8; 64];
+            whole_body.copy_to_slice(&mut report_data_bytes);
             let report_data = tdx_attest_rs::tdx_report_data_t {
-                d: [rng.gen::<u8>(); 64usize],
+                d: report_data_bytes,
             };
+
             let mut tdx_report = tdx_attest_rs::tdx_report_t { d: [0; 1024usize] };
             let result = tdx_attest_rs::tdx_att_get_report(Some(&report_data), &mut tdx_report);
             let mut selected_att_key_id = tdx_attest_rs::tdx_uuid_t { d: [0; 16usize] };
@@ -132,15 +147,34 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
         }
         // todo
         (&Method::POST, "/verify") => {
-            let quote_path = "quote.dat";
-            let quote = std::fs::read(quote_path).expect("Error: Unable to open quote file");
-            let collateral = tee_qv_get_collateral(&quote);
+            let mut whole_body = req
+                .into_body()
+                .collect()
+                .await?
+                .aggregate();
+
+            // Ensure that the body is the correct size for tdx_report_data_t
+            if whole_body.remaining() != 8000 {
+                *response.status_mut() = StatusCode::BAD_REQUEST;
+            }
+
+            // Convert the body into tdx_report_data_t
+            let mut user_quote = [0u8; 8000];
+            whole_body.copy_to_slice(&mut user_quote);
+
+            let collateral = tee_qv_get_collateral(&user_quote);
             let current_time = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or(Duration::ZERO)
                 .as_secs() as i64;
 
-            match tee_verify_quote(&quote, collateral.ok().as_ref(), current_time, None, None) {
+            match tee_verify_quote(
+                &user_quote,
+                collateral.ok().as_ref(),
+                current_time,
+                None,
+                None,
+            ) {
                 Ok((colla_exp_stat, qv_result)) => {
                     collateral_expiration_status = colla_exp_stat;
                     quote_verification_result = qv_result;
