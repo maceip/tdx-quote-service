@@ -144,7 +144,7 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
                 .aggregate();
 
             // Convert the body into tdx_report_data_t
-            let mut user_quote = [0u8; 2722];
+            let mut user_quote = [0u8; 5006];
             whole_body.copy_to_slice(&mut user_quote);
             let mut collateral_expiration_status = 1u32;
             let mut quote_verification_result = sgx_ql_qv_result_t::SGX_QL_QV_RESULT_UNSPECIFIED;
