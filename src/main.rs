@@ -5,9 +5,7 @@ use hyper::service::service_fn;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
 use intel_tee_quote_verification_rs::*;
-use intel_tee_quote_verification_sys as qvl_sys;
 use pki_types::{CertificateDer, PrivateKeyDer};
-use rand::Rng;
 use rustls::ServerConfig;
 use rustls_pemfile::{certs, private_key};
 use std::net::{Ipv4Addr, SocketAddr};
@@ -145,20 +143,18 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
                 .await?
                 .aggregate();
 
-
             // Convert the body into tdx_report_data_t
             let mut user_quote = [0u8; 2722];
             whole_body.copy_to_slice(&mut user_quote);
             let mut collateral_expiration_status = 1u32;
             let mut quote_verification_result = sgx_ql_qv_result_t::SGX_QL_QV_RESULT_UNSPECIFIED;
-        
+
             let mut supp_data: sgx_ql_qv_supplemental_t = Default::default();
             let mut supp_data_desc = tee_supp_data_descriptor_t {
                 major_version: 0,
                 data_size: 0,
                 p_data: &mut supp_data as *mut sgx_ql_qv_supplemental_t as *mut u8,
             };
-        
 
             match tee_get_supplemental_data_version_and_size(&user_quote) {
                 Ok((supp_ver, supp_size)) => {
@@ -179,26 +175,25 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
                     e as u32
                 ),
             }
-    
             // get collateral
             let collateral = tee_qv_get_collateral(&user_quote);
             match collateral {
                 Ok(ref c) => println!("\tInfo: tee_qv_get_collateral successfully returned."),
                 Err(e) => println!("\tError: tee_qv_get_collateral failed: {:#04x}", e as u32),
             };
-    
+
             // set current time. This is only for sample purposes, in production mode a trusted time should be used.
             //
             let current_time = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or(Duration::ZERO)
                 .as_secs() as i64;
-    
+
             let p_supplemental_data = match supp_data_desc.data_size {
                 0 => None,
                 _ => Some(&mut supp_data_desc),
             };
-    
+
             // call DCAP quote verify library for quote verification
             // here you can choose 'trusted' or 'untrusted' quote verification by specifying parameter '&qve_report_info'
             // if '&qve_report_info' is NOT NULL, this API will call Intel QvE to verify quote
@@ -225,8 +220,10 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
                     //
                     if collateral_expiration_status == 0 {
                         println!("\tInfo: App: Verification completed successfully.");
+                        *response.body_mut() = Full::from("verified\n");
                     } else {
                         println!("\tWarning: App: Verification completed, but collateral is out of date based on 'expiration_check_date' you provided.");
+                        *response.status_mut() = StatusCode::NOT_FOUND;
                     }
                 }
                 sgx_ql_qv_result_t::SGX_QL_QV_RESULT_CONFIG_NEEDED
@@ -238,6 +235,7 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
                         "\tWarning: App: Verification completed with Non-terminal result: {:x}",
                         quote_verification_result as u32
                     );
+                    *response.status_mut() = StatusCode::NOT_FOUND;
                 }
                 sgx_ql_qv_result_t::SGX_QL_QV_RESULT_INVALID_SIGNATURE
                 | sgx_ql_qv_result_t::SGX_QL_QV_RESULT_REVOKED
@@ -247,16 +245,21 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
                         "\tError: App: Verification completed with Terminal result: {:x}",
                         quote_verification_result as u32
                     );
+                    *response.status_mut() = StatusCode::NOT_FOUND;
                 }
             }
-        
+
             // check supplemental data if necessary
             //
             if supp_data_desc.data_size > 0 {
                 // you can check supplemental data based on your own attestation/verification policy
                 // here we only print supplemental data version for demo usage
                 //
-                let version_s = unsafe { supp_data.__bindgen_anon_1.__bindgen_anon_1 };
+                let version_s = unsafe {
+                    supp_data
+                        .__bindgen_anon_1
+                        .__bindgen_anon_1
+                };
                 println!(
                     "\tInfo: Supplemental data Major Version: {}",
                     version_s.major_version
@@ -265,7 +268,7 @@ async fn echo(req: Request<Incoming>) -> Result<Response<Full<Bytes>>, hyper::Er
                     "\tInfo: Supplemental data Minor Version: {}",
                     version_s.minor_version
                 );
-        
+
                 // print SA list if exist, SA list is supported from version 3.1
                 //
                 if unsafe { supp_data.__bindgen_anon_1.version } > 3 {
